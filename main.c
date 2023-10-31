@@ -3,6 +3,8 @@
 #include <GL/gl.h>
 #include <gtk/gtk.h>
 
+static GdkGLContext *shared_context = NULL;
+
 static const char *vertex_shader_source =
     "#version 330 core\n"
     "layout (location = 0) in vec3 aPos;\n"
@@ -28,12 +30,10 @@ static GLuint fragment_shader = 0;
 static GLuint vao = 0;
 static GLuint vbo = 0;
 
-static void realize_cb(GtkGLArea *area) {
-  gtk_gl_area_make_current(area);
+static gboolean setup_complete = FALSE;
 
-  GError *error = gtk_gl_area_get_error(area);
-  if (error != NULL) {
-    g_printerr("Failed to setup GL: %s\n", error->message);
+static void setup() {
+  if (setup_complete) {
     return;
   }
 
@@ -62,9 +62,29 @@ static void realize_cb(GtkGLArea *area) {
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
+
+  setup_complete = TRUE;
 }
 
-// static GdkGLContext * create_context_cb(GtkGLArea *area) {}
+static void realize_cb(GtkGLArea *area) {
+  if (shared_context == NULL) {
+    shared_context = gtk_gl_area_get_context(area);
+  }
+
+  gtk_gl_area_make_current(area);
+
+  GError *error = gtk_gl_area_get_error(area);
+  if (error != NULL) {
+    g_printerr("Failed to setup GL: %s\n", error->message);
+    return;
+  }
+
+  setup();
+}
+
+static GdkGLContext *create_context_cb(GtkGLArea *area) {
+  return shared_context;
+}
 
 static gboolean render_cb(GtkGLArea *area, GdkGLContext *context) {
   glClearColor(0, 0, 0, 1.0);
@@ -84,8 +104,8 @@ static GtkWidget *add_window(GtkApplication *app, const char *title) {
 
   GtkWidget *gl_area = gtk_gl_area_new();
   g_signal_connect(gl_area, "realize", G_CALLBACK(realize_cb), NULL);
-  // g_signal_connect(gl_area, "create-context", G_CALLBACK(create_context_cb),
-  // NULL);
+  g_signal_connect(gl_area, "create-context", G_CALLBACK(create_context_cb),
+                   NULL);
   g_signal_connect(gl_area, "render", G_CALLBACK(render_cb), NULL);
   gtk_window_set_child(GTK_WINDOW(window), gl_area);
 
@@ -94,8 +114,8 @@ static GtkWidget *add_window(GtkApplication *app, const char *title) {
 
 static void activate_cb(GtkApplication *app, gpointer user_data) {
   add_window(app, "Window 1");
-  // add_window(app, "Window 2");
-  // add_window(app, "Window 3");
+  add_window(app, "Window 2");
+  add_window(app, "Window 3");
 }
 
 int main(int argc, char **argv) {
