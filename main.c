@@ -30,13 +30,7 @@ static GLuint fragment_shader = 0;
 static GLuint vao = 0;
 static GLuint vbo = 0;
 
-static gboolean setup_complete = FALSE;
-
 static void setup() {
-  if (setup_complete) {
-    return;
-  }
-
   vertex_shader = glCreateShader(GL_VERTEX_SHADER);
   glShaderSource(vertex_shader, 1, &vertex_shader_source, NULL);
   glCompileShader(vertex_shader);
@@ -62,15 +56,9 @@ static void setup() {
 
   glBindBuffer(GL_ARRAY_BUFFER, 0);
   glBindVertexArray(0);
-
-  setup_complete = TRUE;
 }
 
 static void realize_cb(GtkGLArea *area) {
-  if (shared_context == NULL) {
-    shared_context = gtk_gl_area_get_context(area);
-  }
-
   gtk_gl_area_make_current(area);
 
   GError *error = gtk_gl_area_get_error(area);
@@ -79,7 +67,10 @@ static void realize_cb(GtkGLArea *area) {
     return;
   }
 
-  setup();
+  if (shared_context == NULL) {
+    shared_context = gtk_gl_area_get_context(area);
+    setup();
+  }
 }
 
 static GdkGLContext *create_context_cb(GtkGLArea *area) {
